@@ -1,0 +1,104 @@
+substitutions:
+  device_name: minir4-extreme
+
+esphome:
+  name: ${device_name}
+  comment: "Sonoff MiniR4 Extreme"
+
+esp32:
+  board: esp32-c3-devkitm-1
+  variant: esp32c3
+  framework:
+    type: arduino
+    version: recommended
+
+# Enable logging over serial/network
+logger:
+
+# Enable Home Assistant API & Node-RED Native Integration
+api:
+
+# Enable Over-The-Air updates
+ota:
+
+wifi:
+  networks:
+    - ssid: !secret wifi_ssid
+      password: !secret wifi_password
+
+  # Fallback captive portal AP
+  ap:
+    ssid: "${device_name} Fallback Hotspot"
+    password: ""
+
+captive_portal:
+
+web_server:
+  port: 80
+
+sensor:
+  - platform: wifi_signal
+    name: "${device_name} Wifi Signal Strength"
+    update_interval: 90s
+    entity_category: "diagnostic"
+
+  - platform: uptime
+    name: "${device_name} Uptime"
+    update_interval: 300s
+    entity_category: "diagnostic"
+
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      name: "Connected SSID"
+    ip_address:
+      name: "IP Address"
+
+#######################################
+# Device specific Config Begins Below #
+#######################################
+
+status_led:
+  pin:
+    number: GPIO19
+    inverted: true
+
+output:
+  # Physical relay on GPIO01 for Sonoff Mini R4
+  - platform: gpio
+    pin: GPIO01
+    id: relay_1
+
+light:
+  - platform: binary
+    id: light_1
+    name: ${device_name}
+    icon: mdi:ceiling-light-multiple-outline
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: relay_1
+
+binary_sensor:
+  # Onboard micro-button (GPIO09)
+  - platform: gpio
+    pin:
+      number: GPIO09
+      mode: INPUT_PULLUP
+      inverted: true
+    id: button
+    filters:
+      - delayed_off: 50ms
+    on_press:
+      - light.toggle:
+          id: light_1
+
+  # External wall switch input connected to S1/S2 terminals (GPIO02)
+  - platform: gpio
+    pin:
+      number: GPIO02
+      mode: INPUT_PULLUP
+    id: s1
+    name: "${device_name} Switch Input"
+    on_state:
+      then:
+        - light.toggle:
+            id: light_1
