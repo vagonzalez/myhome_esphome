@@ -65,16 +65,16 @@ output:
   # Physical relay on GPIO26 for Sonoff Mini R4
   - platform: gpio
     pin: GPIO26
-    id: relay_1
+    id: relay
 
 light:
   - platform: binary
     id: light_1
     name: ${device_name}
     icon: mdi:ceiling-light-multiple-outline
-    # Correction 2: Restores the state before power loss
+    # Restores the state before power loss
     restore_mode: RESTORE_DEFAULT_OFF
-    output: relay_1
+    output: relay
 
 binary_sensor:
   # Onboard micro-button (GPIO0)
@@ -95,10 +95,12 @@ binary_sensor:
     pin:
       number: GPIO27
       mode: INPUT_PULLUP
-      # Correction 1: Inverts logic to properly sense S1/S2 optocoupler circuit
       inverted: true
     id: s1
     name: "${device_name} Switch Input"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
     on_state:
       then:
         - light.toggle:
