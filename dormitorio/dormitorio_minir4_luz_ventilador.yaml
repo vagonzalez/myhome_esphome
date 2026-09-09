@@ -1,0 +1,105 @@
+substitutions:
+  device_name: dormitorio_luz_ventilador
+
+esphome:
+  name: ${device_name}
+  comment: "Sonoff MiniR4 Extreme"
+
+esp32:
+  board: esp32dev
+  variant: esp32
+  framework:
+    type: arduino
+
+# Enable logging over serial/network
+logger:
+
+# Enable Home Assistant API & Node-RED Native Integration
+api:
+
+# Enable Over-The-Air updates
+ota:
+  - platform: esphome
+
+wifi: 
+  networks: !include { file: ../wifi-networks.yaml }
+
+  # Fallback captive portal AP
+  ap:
+    ssid: ${device_name}
+    password: ""
+
+captive_portal:
+
+web_server:
+  port: 80
+
+sensor:
+  - platform: wifi_signal
+    name: "${device_name} Wifi Signal Strength"
+    update_interval: 90s
+    entity_category: "diagnostic"
+
+  - platform: uptime
+    name: "${device_name} Uptime"
+    update_interval: 300s
+    entity_category: "diagnostic"
+
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      name: "Connected SSID"
+    ip_address:
+      name: "IP Address"
+
+#######################################
+# Device specific Config Begins Below #
+#######################################
+
+status_led:
+  pin:
+    number: GPIO19
+    inverted: true
+
+output:
+  # Physical relay on GPIO26 for Sonoff Mini R4
+  - platform: gpio
+    pin: GPIO26
+    id: relay_1
+
+light:
+  - platform: binary
+    id: light_1
+    name: ${device_name}
+    icon: mdi:ceiling-light-multiple-outline
+    # Correction 2: Restores the state before power loss
+    restore_mode: RESTORE_DEFAULT_OFF
+    output: relay_1
+
+binary_sensor:
+  # Onboard micro-button (GPIO0)
+  - platform: gpio
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: true
+    id: button
+    filters:
+      - delayed_off: 50ms
+    on_press:
+      - light.toggle:
+          id: light_1
+
+  # External wall switch input connected to S1/S2 terminals (GPIO27)
+  - platform: gpio
+    pin:
+      number: GPIO27
+      mode: INPUT_PULLUP
+      # Correction 1: Inverts logic to properly sense S1/S2 optocoupler circuit
+      inverted: true
+    id: s1
+    name: "${device_name} Switch Input"
+    on_state:
+      then:
+        - light.toggle:
+            id: light_1
