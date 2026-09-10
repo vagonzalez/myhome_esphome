@@ -1,38 +1,14 @@
 substitutions:
   device_name: dormitorio_luz_ventilador
+  enable_bluetooth: "false"
+  detatched_mode: "false"
 
-esphome:
-  name: ${device_name}
-  comment: "Sonoff MiniR4 Extreme"
-
-esp32:
-  board: esp32dev
-  variant: esp32
-  framework:
-    type: arduino
-
-# Enable logging over serial/network
-logger:
-
-# Enable Home Assistant API & Node-RED Native Integration
-api:
-
-# Enable Over-The-Air updates
-ota:
-  - platform: esphome
-
-wifi: 
-  networks: !include { file: ../wifi-networks.yaml }
-
-  # Fallback captive portal AP
-  ap:
-    ssid: ${device_name}
-    password: ""
-
-captive_portal:
-
-web_server:
-  port: 80
+packages:
+  - !include 
+    file: ../sonoff-mini-r4/defaults.yaml
+    vars: 
+      device_name: ${device_name}
+      enable_bluetooth: ${enable_bluetooth}
 
 sensor: !include 
   file: ../sonoff-mini-r4/sensors.yaml
@@ -45,15 +21,6 @@ text_sensor:
       name: "Connected SSID"
     ip_address:
       name: "IP Address"
-
-## Uncomment the following lines to enable Bluetooth scanning for BLE devices
-
-#esp32_ble_tracker:
-#  scan_parameters:
-#    interval: 1100ms
-#    window: 1100ms
-
-#bluetooth_proxy:
 
 ## Physical switch to control the relay and the relay LED
 
@@ -70,7 +37,8 @@ switch:
       - light.turn_off: relay_led
 
 output:
-  !include { file: ../sonoff-mini-r4/relay-led.yaml }
+  !include 
+    file: ../sonoff-mini-r4/relay-led.yaml
 
 light:
   - platform: binary
