@@ -36,7 +36,7 @@ web_server:
 
 sensor:
   - platform: wifi_signal
-    name: "${device_name} Wifi Signal Strength"
+    name: "${device_name} Wifi RSSI"
     update_interval: 90s
     entity_category: "diagnostic"
 
@@ -52,56 +52,65 @@ text_sensor:
     ip_address:
       name: "IP Address"
 
-#######################################
-# Device specific Config Begins Below #
-#######################################
+## Uncomment the following lines to enable Bluetooth scanning for BLE devices
 
-status_led:
-  pin:
-    number: GPIO19
-    inverted: true
+#esp32_ble_tracker:
+#  scan_parameters:
+#    interval: 1100ms
+#    window: 1100ms
+
+#bluetooth_proxy:
+
+## Physical switch to control the relay and the relay LED
+
+switch:
+  - platform: gpio
+    name: Mini R4 Rele
+    pin:
+      number: GPIO26
+      inverted: false
+    id: relay
+    on_turn_on:
+      - light.turn_on: relay_led
+    on_turn_off:
+      - light.turn_off: relay_led
 
 output:
-  # Physical relay on GPIO26 for Sonoff Mini R4
   - platform: gpio
-    pin: GPIO26
-    id: relay
+    pin: GPIO19
+    inverted: True
+    id: relay1_led_gpio
 
 light:
   - platform: binary
-    id: light_1
-    name: ${device_name}
-    icon: mdi:ceiling-light-multiple-outline
-    # Restores the state before power loss
-    restore_mode: RESTORE_DEFAULT_OFF
-    output: relay
+    name: "Relay LED"
+    id: relay_led
+    internal: true    
+    output: relay1_led_gpio
 
 binary_sensor:
-  # Onboard micro-button (GPIO0)
-  - platform: gpio
-    pin:
-      number: GPIO0
-      mode: INPUT_PULLUP
-      inverted: true
-    id: button
-    filters:
-      - delayed_off: 50ms
-    on_press:
-      - light.toggle:
-          id: light_1
-
-  # External wall switch input connected to S1/S2 terminals (GPIO27)
   - platform: gpio
     pin:
       number: GPIO27
       mode: INPUT_PULLUP
-      inverted: true
-    id: s1
-    name: "${device_name} Switch Input"
-    filters:
-      - delayed_on: 50ms
-      - delayed_off: 50ms
+      inverted: false
+    name: Mini R4 Switch
     on_state:
-      then:
-        - light.toggle:
-            id: light_1
+      - switch.toggle: relay
+#    on_state:
+#      if:
+#        condition:
+#          not:
+#            api.connected:
+#        then:
+#          - switch.toggle: relay
+
+  - platform: gpio
+    internal: true
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: false
+    name: Mini R4 Boton
+    on_press:
+      - switch.toggle: relay
