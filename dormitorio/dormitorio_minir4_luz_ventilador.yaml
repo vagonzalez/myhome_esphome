@@ -34,16 +34,10 @@ captive_portal:
 web_server:
   port: 80
 
-sensor:
-  - platform: wifi_signal
-    name: "${device_name} Wifi RSSI"
-    update_interval: 90s
-    entity_category: "diagnostic"
-
-  - platform: uptime
-    name: "${device_name} Uptime"
-    update_interval: 300s
-    entity_category: "diagnostic"
+sensor: !include 
+  file: ../sonoff-mini-r4/sensors.yaml
+  vars: 
+    device_name: ${device_name}
 
 text_sensor:
   - platform: wifi_info
@@ -76,10 +70,7 @@ switch:
       - light.turn_off: relay_led
 
 output:
-  - platform: gpio
-    pin: GPIO19
-    inverted: True
-    id: relay1_led_gpio
+  !include { file: ../sonoff-mini-r4/relay-led.yaml }
 
 light:
   - platform: binary

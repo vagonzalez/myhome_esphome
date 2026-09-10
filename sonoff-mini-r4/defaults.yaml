@@ -1,0 +1,29 @@
+esphome:
+  name: ${device_name}
+  comment: "Sonoff MiniR4 Extreme"
+
+esp32:
+  board: esp32dev
+  variant: esp32
+  framework:
+    type: arduino
+
+# Enable logging over serial/network
+logger:
+
+# Enable Home Assistant API & Node-RED Native Integration
+api:
+
+# Enable Over-The-Air updates
+ota:
+  - platform: esphome
+
+wifi: 
+  networks: !include { file: ../wifi-networks.yaml }
+
+  # Fallback captive portal AP
+  ap:
+    ssid: ${device_name}
+    password: ""
+
+captive_portal:
