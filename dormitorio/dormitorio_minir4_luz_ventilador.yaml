@@ -52,7 +52,7 @@ binary_sensor:
     pin:
       number: GPIO27
       mode: INPUT_PULLUP
-      inverted: false
+      inverted: true
     name: Mini R4 Switch
     on_state:
       - switch.toggle: relay

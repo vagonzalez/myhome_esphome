@@ -1,0 +1,33 @@
+substitutions:
+  device_name: test
+  enable_bluetooth: "false"
+  detatched_mode: "false"
+
+packages:
+  - !include 
+    file: ../sonoff-mini-r4/defaults.yaml
+    vars: 
+      device_name: ${device_name}
+      enable_bluetooth: ${enable_bluetooth}
+  - !include 
+    file: ../sonoff-mini-r4/sensors.yaml
+    vars: 
+      device_name: ${device_name}
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO04
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+    name: "S1/S2 Switch"
+    id: s1_s2_switch
+    filters:
+      - invert:
+      - delayed_off: 50ms
+      - delayed_on: 50ms
+    on_state:
+      - lambda: |-
+          ESP_LOGI("s1_s2", "S1/S2 Switch state: %s", x ? "CLOSED" : "OPEN");
