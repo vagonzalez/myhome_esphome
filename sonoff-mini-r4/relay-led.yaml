@@ -1,0 +1,4 @@
+- platform: gpio
+  pin: GPIO19
+  inverted: True
+  id: relay1_led_gpio

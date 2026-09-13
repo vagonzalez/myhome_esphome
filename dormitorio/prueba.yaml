@@ -1,0 +1,62 @@
+substitutions:
+  device_name: dormitorio_luz_ventilador
+  enable_bluetooth: "false"
+  detatched_mode: "false"
+
+packages:
+  - !include 
+    file: ../sonoff-mini-r4/defaults.yaml
+    vars: 
+      device_name: ${device_name}
+      enable_bluetooth: ${enable_bluetooth}
+
+sensor: !include 
+  file: ../sonoff-mini-r4/sensors.yaml
+  vars: 
+    device_name: ${device_name}
+
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      name: "Connected SSID"
+    ip_address:
+      name: "IP Address"
+
+# Habilitamos la salida que alimenta el circuito de detección S1/S2
+output:
+  - platform: gpio
+    pin: GPIO19
+    inverted: true
+    id: relay1_led_gpio
+
+light:
+  - platform: binary
+    name: "Relay LED"
+    id: relay_led
+    internal: true
+    output: relay1_led_gpio
+
+switch:
+  - platform: gpio
+    name: "Rele MiniR4"
+    pin:
+      number: GPIO26
+      inverted: false
+    id: relay
+    on_turn_on:
+      - light.turn_on: relay_led
+    on_turn_off:
+      - light.turn_off: relay_led
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO27
+      mode: INPUT
+      inverted: true
+    name: "Mini R4 Switch"
+    filters:
+      - delayed_on: 50ms
+      - delayed_off: 50ms
+    on_state:
+      - switch.toggle: relay

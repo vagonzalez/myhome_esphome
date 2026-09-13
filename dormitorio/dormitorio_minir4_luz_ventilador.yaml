@@ -1,49 +1,19 @@
 substitutions:
   device_name: dormitorio_luz_ventilador
+  enable_bluetooth: "false"
+  detatched_mode: "false"
 
-esphome:
-  name: ${device_name}
-  comment: "Sonoff MiniR4 Extreme"
+packages:
+  - !include 
+    file: ../sonoff-mini-r4/defaults.yaml
+    vars: 
+      device_name: ${device_name}
+      enable_bluetooth: ${enable_bluetooth}
 
-esp32:
-  board: esp32dev
-  variant: esp32
-  framework:
-    type: arduino
-
-# Enable logging over serial/network
-logger:
-
-# Enable Home Assistant API & Node-RED Native Integration
-api:
-
-# Enable Over-The-Air updates
-ota:
-  - platform: esphome
-
-wifi: 
-  networks: !include { file: ../wifi-networks.yaml }
-
-  # Fallback captive portal AP
-  ap:
-    ssid: ${device_name}
-    password: ""
-
-captive_portal:
-
-web_server:
-  port: 80
-
-sensor:
-  - platform: wifi_signal
-    name: "${device_name} Wifi Signal Strength"
-    update_interval: 90s
-    entity_category: "diagnostic"
-
-  - platform: uptime
-    name: "${device_name} Uptime"
-    update_interval: 300s
-    entity_category: "diagnostic"
+sensor: !include 
+  file: ../sonoff-mini-r4/sensors.yaml
+  vars: 
+    device_name: ${device_name}
 
 text_sensor:
   - platform: wifi_info
@@ -52,56 +22,67 @@ text_sensor:
     ip_address:
       name: "IP Address"
 
-#######################################
-# Device specific Config Begins Below #
-#######################################
+## Physical switch to control the relay and the relay LED
 
-status_led:
-  pin:
-    number: GPIO19
-    inverted: true
+#esp32_ble_tracker:
+#  scan_parameters:
+#    interval: 1100ms
+#    window: 1100ms
+
+#bluetooth_proxy:
+
+
+switch:
+  - platform: gpio
+    name: Rele MiniR4
+    pin:
+      number: GPIO26
+      inverted: false
+    id: relay
+    on_turn_on:
+      - light.turn_on: relay_led
+    on_turn_off:
+      - light.turn_off: relay_led
 
 output:
-  # Physical relay on GPIO26 for Sonoff Mini R4
   - platform: gpio
-    pin: GPIO26
-    id: relay
+    pin: GPIO19
+    inverted: True
+    id: relay1_led_gpio
 
 light:
   - platform: binary
-    id: light_1
-    name: ${device_name}
-    icon: mdi:ceiling-light-multiple-outline
-    # Restores the state before power loss
-    restore_mode: RESTORE_DEFAULT_OFF
-    output: relay
+    name: "Relay LED"
+    id: relay_led
+    internal: true    
+    output: relay1_led_gpio
 
 binary_sensor:
-  # Onboard micro-button (GPIO0)
-  - platform: gpio
-    pin:
-      number: GPIO0
-      mode: INPUT_PULLUP
-      inverted: true
-    id: button
-    filters:
-      - delayed_off: 50ms
-    on_press:
-      - light.toggle:
-          id: light_1
-
-# External wall switch input connected to S1/S2 terminals (GPIO27)
   - platform: gpio
     pin:
       number: GPIO27
-      mode: INPUT_PULLUP
+      mode:
+        input: true
+        pullup: true
       inverted: true
-    id: s1
-    name: "${device_name} Switch Input"
+    name: "Interruptor S2"
+    id: external_switch
+    # Opcional: Filtro para evitar rebotes eléctricos de la red
     filters:
-      - delayed_on: 50ms
-      - delayed_off: 50ms
-    on_state:
-      then:
-        - light.toggle:
-            id: light_1
+      - delayed_on_off: 60ms
+#    on_state:
+#      if:
+#        condition:
+#          not:
+#            api.connected:
+#        then:
+#          - switch.toggle: relay
+  - platform: gpio
+    internal: true
+    pin:
+      number: GPIO0
+      mode: INPUT_PULLUP
+      inverted: false
+    name: Mini R4 Boton
+    on_press:
+      - switch.toggle: relay
