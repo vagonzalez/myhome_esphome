@@ -1,35 +1,29 @@
 substitutions:
   device_name: dormitorio_luz_ventilador
   enable_bluetooth: "false"
-  detatched_mode: "false"
+
 
 packages:
-  - !include 
+  - !include
     file: ../sonoff-mini-r4/defaults.yaml
-    vars: 
+    vars:
       device_name: ${device_name}
       enable_bluetooth: ${enable_bluetooth}
 
-sensor: !include 
-  file: ../sonoff-mini-r4/sensors.yaml
-  vars: 
-    device_name: ${device_name}
+  - !include
+    file: ../sonoff-mini-r4/sensors.yaml
+    vars:
+      device_name: ${device_name}
 
-text_sensor:
-  - platform: wifi_info
-    ssid:
-      name: "Connected SSID"
-    ip_address:
-      name: "IP Address"
+api:
+  id: api_id
 
-## Physical switch to control the relay and the relay LED
+# ================================================================
+# FLASH PREFERENCES
+# ================================================================
 
-#esp32_ble_tracker:
-#  scan_parameters:
-#    interval: 1100ms
-#    window: 1100ms
-
-#bluetooth_proxy:
+preferences:
+  flash_write_interval: 5min
 
 
 switch:
@@ -58,25 +52,37 @@ light:
     output: relay1_led_gpio
 
 binary_sensor:
+  - platform: template
+    name: "Home Assistant Connected"
+    id: ha_connected
+    device_class: connectivity
+    lambda: |-
+      for (const auto &client : id(api_id).active_clients()) {
+        if (client->is_marked_for_removal() ||
+            !client->is_authenticated())
+          continue;
+
+        const std::string name = client->get_name();
+        if (name.rfind("Home Assistant", 0) == 0)
+          return true;
+      }
+      return false;
+
   - platform: gpio
     pin:
       number: GPIO27
-      mode:
-        input: true
-        pullup: true
-      inverted: true
-    name: "Interruptor S2"
-    id: external_switch
-    # Opcional: Filtro para evitar rebotes eléctricos de la red
-    filters:
-      - delayed_on_off: 60ms
-#    on_state:
-#      if:
-#        condition:
-#          not:
-#            api.connected:
-#        then:
-#          - switch.toggle: relay
+      mode: INPUT_PULLUP
+      inverted: false
+    name: Mini R4 Switch
+
+    on_state:
+      then:
+        - if:
+            condition:
+              binary_sensor.is_off: ha_connected
+            then:
+              - switch.toggle: relay
+
   - platform: gpio
     internal: true
     pin:
@@ -86,3 +92,10 @@ binary_sensor:
     name: Mini R4 Boton
     on_press:
       - switch.toggle: relay
+
+
+#interval:
+#  - interval: 2s
+#    then:
+#      - lambda: |-
+#          ESP_LOGI("MINIR4", "Home Assistant connected %d", id(ha_connected).state);
