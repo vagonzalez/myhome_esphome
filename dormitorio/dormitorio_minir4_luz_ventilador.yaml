@@ -1,101 +1,351 @@
 substitutions:
-  device_name: dormitorio_luz_ventilador
-  enable_bluetooth: "false"
+  device_name: sonoff-mini-r4
+  friendly_name: "Sonoff Mini R4"
 
 
-packages:
-  - !include
-    file: ../sonoff-mini-r4/defaults.yaml
-    vars:
-      device_name: ${device_name}
-      enable_bluetooth: ${enable_bluetooth}
+# =============================================================================
+# ESPHOME
+# =============================================================================
 
-  - !include
-    file: ../sonoff-mini-r4/sensors.yaml
-    vars:
-      device_name: ${device_name}
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "Sonoff MINI R4 - Detached relay with HA fail-safe"
 
-api:
-  id: api_id
+  # Apply the selected power-on behaviour only after all persistent
+  # configuration entities have been restored.
+  on_boot:
+    priority: -100
+    then:
+      - lambda: |-
+          const auto mode = id(power_restore_mode).current_option();
 
-# ================================================================
-# FLASH PREFERENCES
-# ================================================================
+          if (mode == "Always On") {
+            id(relay).turn_on();
+          } else if (mode == "Restore Previous") {
+            if (id(relay_last_state)) {
+              id(relay).turn_on();
+            } else {
+              id(relay).turn_off();
+            }
+          } else {
+            // "Always Off"
+            id(relay).turn_off();
+          }
+
+      # From this point onwards, genuine relay changes may update
+      # the stored previous state.
+      - lambda: |-
+          id(boot_complete) = true;
+
+
+esp32:
+  variant: ESP32
+  framework:
+    type: esp-idf
+
+
+# =============================================================================
+# FLASH / PERSISTENCE
+# =============================================================================
 
 preferences:
+  # Batch persistent writes to reduce flash wear.
   flash_write_interval: 5min
 
 
-switch:
-  - platform: gpio
-    name: Rele MiniR4
-    pin:
-      number: GPIO26
-      inverted: false
-    id: relay
-    on_turn_on:
-      - light.turn_on: relay_led
-    on_turn_off:
-      - light.turn_off: relay_led
+# =============================================================================
+# NETWORK
+# =============================================================================
 
-output:
-  - platform: gpio
-    pin: GPIO19
-    inverted: True
-    id: relay1_led_gpio
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
 
-light:
-  - platform: binary
-    name: "Relay LED"
-    id: relay_led
-    internal: true    
-    output: relay1_led_gpio
+  ap:
+    ssid: "${friendly_name} Fallback"
+    password: !secret fallback_password
 
-binary_sensor:
+captive_portal:
+
+
+# =============================================================================
+# HOME ASSISTANT API
+# =============================================================================
+
+api:
+  id: api_server
+  encryption:
+    key: !secret api_encryption_key
+
+
+# =============================================================================
+# OTA
+# =============================================================================
+
+ota:
+  - platform: esphome
+    password: !secret ota_password
+
+
+# =============================================================================
+# LOGGING
+# =============================================================================
+
+logger:
+  level: INFO
+
+
+# =============================================================================
+# STATUS LED
+# =============================================================================
+
+status_led:
+  pin:
+    number: GPIO19
+    inverted: true
+
+
+# =============================================================================
+# INTERNAL STATE
+# =============================================================================
+
+globals:
+
+  # Last genuine relay state.
+  #
+  # Only one persistent boolean is required.
+  # Writes are delayed by flash_write_interval above.
+  - id: relay_last_state
+    type: bool
+    restore_value: true
+    initial_value: "false"
+
+  # RAM only.
+  #
+  # Prevents the boot restore operation itself from overwriting
+  # relay_last_state.
+  - id: boot_complete
+    type: bool
+    restore_value: false
+    initial_value: "false"
+
+
+# =============================================================================
+# CONFIGURATION SELECTS
+# =============================================================================
+
+select:
+
+  # ---------------------------------------------------------------------------
+  # DETACHED RELAY MODE
+  # ---------------------------------------------------------------------------
+
   - platform: template
-    name: "Home Assistant Connected"
-    id: ha_connected
-    device_class: connectivity
-    lambda: |-
-      for (const auto &client : id(api_id).active_clients()) {
-        if (client->is_marked_for_removal() ||
-            !client->is_authenticated())
-          continue;
+    id: relay_mode
+    name: "Relay Mode"
+    icon: mdi:electric-switch
+    entity_category: config
 
-        const std::string name = client->get_name();
-        if (name.rfind("Home Assistant", 0) == 0)
-          return true;
-      }
-      return false;
+    options:
+      - "Normal"
+      - "Detached"
+
+    initial_option: "Normal"
+    optimistic: true
+    restore_value: true
+
+
+  # ---------------------------------------------------------------------------
+  # POWER-ON RESTORE MODE
+  #
+  # Always Off:
+  #     Relay remains OFF after reboot.
+  #
+  # Always On:
+  #     Relay turns ON after boot.
+  #
+  # Restore Previous:
+  #     Relay returns to the last recorded state.
+  # ---------------------------------------------------------------------------
+
+  - platform: template
+    id: power_restore_mode
+    name: "Power-on Restore Mode"
+    icon: mdi:restart
+    entity_category: config
+
+    options:
+      - "Always Off"
+      - "Always On"
+      - "Restore Previous"
+
+    initial_option: "Always Off"
+    optimistic: true
+    restore_value: true
+
+
+  # ---------------------------------------------------------------------------
+  # MANUAL OVERRIDE
+  #
+  # Automatic:
+  #     Normal detached-mode behaviour.
+  #
+  # Force Manual:
+  #     S1/S2 always controls the relay locally.
+  #     Detached mode and HA connection state are ignored.
+  # ---------------------------------------------------------------------------
+
+  - platform: template
+    id: manual_mode
+    name: "Manual Mode"
+    icon: mdi:hand-back-right
+    entity_category: config
+
+    options:
+      - "Automatic"
+      - "Force Manual"
+
+    initial_option: "Automatic"
+    optimistic: true
+    restore_value: true
+
+
+# =============================================================================
+# RELAY
+# =============================================================================
+
+switch:
 
   - platform: gpio
-    pin:
-      number: GPIO27
-      mode: INPUT_PULLUP
-      inverted: false
-    name: Mini R4 Switch
+    id: relay
+    name: "Relay"
 
-    on_state:
+    pin: GPIO26
+
+    # IMPORTANT:
+    #
+    # Always initialise safely OFF at the hardware-switch level.
+    # Our Power-on Restore Mode is applied later in esphome.on_boot.
+    #
+    # This prevents the relay from briefly assuming a previously stored
+    # state before our configuration select has been restored.
+    restore_mode: ALWAYS_OFF
+
+    on_turn_on:
       then:
         - if:
             condition:
-              binary_sensor.is_off: ha_connected
+              lambda: |-
+                return id(boot_complete);
             then:
-              - switch.toggle: relay
+              - lambda: |-
+                  id(relay_last_state) = true;
+
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: |-
+                return id(boot_complete);
+            then:
+              - lambda: |-
+                  id(relay_last_state) = false;
+
+
+# =============================================================================
+# INPUTS
+# =============================================================================
+
+binary_sensor:
+
+  # ---------------------------------------------------------------------------
+  # S1 / S2 WALL SWITCH
+  #
+  # S1 = GND
+  # S2 = GPIO27
+  #
+  # A maintained/toggle wall switch is assumed.
+  # Both physical transitions therefore count as an action.
+  # ---------------------------------------------------------------------------
 
   - platform: gpio
+    id: wall_switch
+    name: "Wall Switch"
+
+    pin:
+      number: GPIO27
+
+    filters:
+      - invert:
+      - delayed_on: 30ms
+      - delayed_off: 30ms
+
+    on_state:
+      then:
+
+        # Effective detached mode requires ALL of these:
+        #
+        #   1. Relay Mode = Detached
+        #   2. Manual Mode = Automatic
+        #   3. Home Assistant is connected
+        #
+        # If any condition is false, local relay control is retained.
+
+        - if:
+            condition:
+              and:
+
+                - lambda: |-
+                    return id(relay_mode).current_option() == "Detached";
+
+                - lambda: |-
+                    return id(manual_mode).current_option() == "Automatic";
+
+                - api.connected:
+                    state_subscription_only: true
+
+            then:
+
+              # Detached mode is genuinely active.
+              #
+              # Publish the wall-switch state to HA but leave
+              # the physical relay unchanged.
+              - logger.log:
+                  level: INFO
+                  format: "Wall switch changed - detached mode active"
+
+            else:
+
+              # Local operation applies when:
+              #
+              # - Relay Mode = Normal
+              # - Manual Mode = Force Manual
+              # - HA is unavailable
+              #
+              - switch.toggle: relay
+
+
+  # ---------------------------------------------------------------------------
+  # ONBOARD MINI R4 BUTTON
+  #
+  # Always provides direct relay control.
+  # ---------------------------------------------------------------------------
+
+  - platform: gpio
+    id: onboard_button
     internal: true
+
     pin:
       number: GPIO0
-      mode: INPUT_PULLUP
-      inverted: false
-    name: Mini R4 Boton
+      mode:
+        input: true
+        pullup: true
+      inverted: true
+
+    filters:
+      - delayed_on: 30ms
+
     on_press:
-      - switch.toggle: relay
-
-
-#interval:
-#  - interval: 2s
-#    then:
-#      - lambda: |-
-#          ESP_LOGI("MINIR4", "Home Assistant connected %d", id(ha_connected).state);
+      then:
+        - switch.toggle: relay
