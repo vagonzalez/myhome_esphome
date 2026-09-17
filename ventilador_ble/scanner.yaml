@@ -1,0 +1,73 @@
+esphome:
+  name: ufesa-ble-test
+  friendly_name: Ufesa BLE Test
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+# ---------------------------------------------------------
+# Logger
+# ---------------------------------------------------------
+logger:
+  level: INFO
+
+# ---------------------------------------------------------
+# Home Assistant API
+# ---------------------------------------------------------
+api:
+
+# ---------------------------------------------------------
+# OTA updates
+# ---------------------------------------------------------
+ota:
+  - platform: esphome
+
+# ---------------------------------------------------------
+# Wi-Fi
+# ---------------------------------------------------------
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "Ufesa BLE Test Fallback"
+    password: "ufesa-test-1234"
+
+captive_portal:
+
+# ---------------------------------------------------------
+# BLE scanner
+#
+# We have identified the probable Ufesa remote as:
+#
+#   E8:FD:F8:83:16:31
+#
+# Only advertisements from this address are logged.
+# ---------------------------------------------------------
+esp32_ble_tracker:
+  scan_parameters:
+    interval: 320ms
+    window: 300ms
+    active: true
+
+  on_ble_advertise:
+    - mac_address: E8:FD:F8:83:16:31
+      then:
+        - lambda: |-
+            for (auto &data : x.get_manufacturer_datas()) {
+              ESP_LOGI(
+                "UFESA",
+                "RSSI=%d DATA=%s",
+                x.get_rssi(),
+                format_hex_pretty(data.data).c_str()
+              );
+            }
+
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      name: "Connected SSID"
+    ip_address:
+      name: "IP Address"

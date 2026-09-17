@@ -4,4 +4,4 @@ packages:
     file: ../sonoff-mini-r4/dettachable_relay_sonoff_mini_r4.yaml
     vars:
       device_name: "pb_dormitorio_minir4"
-      friendly_name: "Dormitorio Luz"
+      friendly_name: "Luz dormitorio"
