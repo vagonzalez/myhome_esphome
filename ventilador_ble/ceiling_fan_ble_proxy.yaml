@@ -27,13 +27,12 @@ wifi:
 
   ap:
     ssid: "Ventilador BLE Proxy Fallback"
-    password: "comocabra"
 
 captive_portal:
 
 web_server:
   port: 80
-  # version: 3
+  version: 3
 
 text_sensor:
   - platform: wifi_info
