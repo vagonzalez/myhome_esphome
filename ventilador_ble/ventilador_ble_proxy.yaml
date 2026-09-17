@@ -1,0 +1,7 @@
+# Customized for Dormitorio
+packages:
+  - !include
+    file: ./ceiling_fan_ble_proxy.yaml
+    vars:
+      device_name: "pb_dormitorio_ble_proxy"
+      friendly_name: "BLE Proxy Dormitorio"
