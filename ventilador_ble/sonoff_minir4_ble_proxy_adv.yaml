@@ -1,0 +1,153 @@
+esphome:
+  name: ${device_name}
+  friendly_name: ${friendly_name}
+  comment: "BLE ADV Proxy - Sonoff MINI R4"
+
+  # Explicitly force the relay OFF during startup.
+  on_boot:
+    priority: 800
+    then:
+      - switch.turn_off: relay_disabled
+
+
+# =========================================================
+# ESP32
+# =========================================================
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+    advanced:
+      minimum_chip_revision: "3.1"
+      sram1_as_iram: true
+
+
+# =========================================================
+# Logging
+# =========================================================
+
+logger:
+  level: DEBUG
+  logs:
+    ble_adv_proxy: DEBUG
+
+
+# =========================================================
+# Home Assistant API
+# =========================================================
+
+api:
+  custom_services: true
+  homeassistant_services: true
+
+
+# =========================================================
+# OTA
+# =========================================================
+
+ota:
+  - platform: esphome
+
+
+# =========================================================
+# Wi-Fi
+# =========================================================
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  ap:
+    ssid: "ADV BLE Proxy Fallback"
+
+
+# =========================================================
+# Captive portal
+# =========================================================
+
+captive_portal:
+
+
+# =========================================================
+# Web server
+# =========================================================
+
+web_server:
+  port: 80
+  version: 3
+  local: true
+
+
+# =========================================================
+# Wi-Fi information
+# =========================================================
+
+text_sensor:
+  - platform: wifi_info
+    ssid:
+      name: "Connected SSID"
+
+    ip_address:
+      name: "IP Address"
+
+
+# =========================================================
+# Sonoff MINI R4 relay
+#
+# GPIO26 is the relay output on this hardware.
+#
+# - internal: true
+#     Prevents the relay from appearing as a controllable
+#     entity in Home Assistant.
+#
+# - restore_mode: ALWAYS_OFF
+#     ESPHome always initialises it in the OFF state.
+#
+# - on_boot above explicitly commands it OFF as well.
+# =========================================================
+
+switch:
+  - platform: gpio
+    id: relay_disabled
+    pin: GPIO26
+    internal: true
+    restore_mode: ALWAYS_OFF
+
+
+# =========================================================
+# BLE ADV Proxy
+# =========================================================
+
+external_components:
+  - source: github://NicoIIT/esphome-ble_adv_proxy
+
+
+ble_adv_proxy:
+  use_max_tx_power: true
+
+
+# =========================================================
+# BLE scanner
+#
+# 300 / 320 ms = 93.75% scan duty cycle.
+#
+# Retaining these values for now because this ESP32 is
+# dedicated primarily to the BLE ADV proxy.
+# =========================================================
+
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+    interval: 320ms
+    window: 300ms
+
+
+# =========================================================
+# Diagnostic controls
+# =========================================================
+
+button:
+  - platform: restart
+    name: "Restart BLE ADV Proxy"
+    entity_category: diagnostic
